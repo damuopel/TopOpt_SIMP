@@ -32,6 +32,12 @@ class Material():
 		# Plain Stress
 		self.D = (E/(1-nu**2))*np.array([[1,nu,0],[nu,1,0],[0,0,(1-nu)/2]])
 
+class TopOpt():
+	def __init__(self,x,v,r):
+		self.x = x
+		self v = v
+		self.r = r
+
 class BoundaryConditions():
 	def __init__(self):
 		pass
