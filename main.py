@@ -15,6 +15,7 @@ class Mesh():
 	def __init__(self,nx,ny):
 		self.nx = nx
 		self.ny = ny
+		self.nEl = nx*ny
 		# Coordinate 
 		x = np.linspace(0,h*nx,nx+1)
 		y = np.linspace(0,h*ny,ny+1)
@@ -37,9 +38,24 @@ class TopOpt():
 		self.x = x
 		self v = v
 		self.r = r
+	def Filter(self,Mesh):
+		H = np.zeros((Mesh.nEl,Mesh.nEl)
+		coords = Mesh.xy[:,Mesh.Topology]
+		x = sum(np.reshape(coords[1,:],4,Mesh.nEl))/4
+		y = sum(np.reshape(coords[2,:],4,Mesh.nEl))/4
+		center = np.array([x,y])
+		for iElm in range(0,Mesh.nEl):
+			d = sum((center-center[:,iElm])**2)**0.5
+			H[:,iElm] = max(0,self.r-d)
+		self.H = H
+		return H
 
-class BoundaryConditions():
-	def __init__(self):
+class FEM():
+	def K(self):
+		pass
+	def Loads(self):
+		pass
+	def Solver(self):
 		pass
 
 # Functions
@@ -70,7 +86,10 @@ if __name__ == '__main__':
 	v = sys.arg[4]
 	# Initialize variables
 	x = v*np.ones(nx*ny)
+	top = TopOpt(x,v,r)
 	material = Material()
+	mesh = Mesh(nx,ny)
+	H = top.Filter(mesh)
 	change = 1000
 	while change > 1e-4:
 		pass
