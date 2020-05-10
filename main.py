@@ -62,10 +62,10 @@ class TopOpt():
             for jElm in range(0,Mesh.nElms):
                 d = np.sum(np.subtract(center[:,jElm],center[:,iElm])**2,axis=0)**0.5
                 self.H[jElm,iElm] = np.maximum(0,self.r-d)
-        return self.H
     
     def FilterSensitivities(self):
-        pass
+        sumH = np.sum(self.H,axis=0)
+        self.dc = self.H@(self.x*self.dc)/(self.x*sumH[:,None])
     
     def OptimalityCriteria(self,Mesh):
         # Bisection Method
@@ -74,7 +74,7 @@ class TopOpt():
         move = 0.2
         while (abs(l2-l1) > 1e-4):
             lmid = 0.5*(l1+l2)
-            self.x = max(1e-3,max(self.x-move,min(1.0,min(self.x+move,self.x*np.sqrt(-self.dc/lmid)))))
+            self.x = np.maximum(1e-3,np.maximum(self.x-move,np.minimum(1.0,np.minimum(self.x+move,self.x*np.sqrt(-self.dc/lmid)))))
             if sum(self.x) - self.v*Mesh.nElms > 0:
                 l1 = lmid
             else:
@@ -170,8 +170,8 @@ if __name__ == '__main__':
         v = sys.argv[4]
         p = sys.argv[5]
     else:
-        nx = 2
-        ny = 2
+        nx = 20
+        ny = 10
         r = 1.5
         v = 0.3
         p = 3
@@ -185,8 +185,8 @@ if __name__ == '__main__':
     x = v*np.ones((nx*ny,1))
     xold = x
     top = TopOpt(x,xold,v,r,p)
-    H = top.CreateFilter(mesh)
-    change = 0
+    top.CreateFilter(mesh)
+    change = 1000
     it = 0
     while change > 1e-4 and it < 300:
         it += 1
@@ -199,7 +199,7 @@ if __name__ == '__main__':
             iNodes = mesh.Topology[:,iElm]
             iDofs = np.array([2*iNodes,2*iNodes+1]).T.flatten()
             iK = K0[iElm,:].reshape(dofsElements,dofsElements)
-            top.dc[iElm] = top.p*top.x[iElm]**(top.p-1)*u[iDofs].T@iK@u[iDofs]
+            top.dc[iElm] = -top.p*top.x[iElm]**(top.p-1)*u[iDofs].T@iK@u[iDofs]
             top.c = top.c + top.x[iElm]**(top.p)*u[iDofs].T@iK@u[iDofs]
         # Update material distribution
         top.FilterSensitivities()
@@ -208,8 +208,8 @@ if __name__ == '__main__':
         top.xold = top.x
         # Plot material distribution
         ax.clear()
-        ax.pcolor(x,y,top.x)
-        ax.colorbar()
+        plt.pcolor(top.x.reshape(ny,nx),edgecolors='k',linewidth=1)
+        plt.show()
         
         
 
