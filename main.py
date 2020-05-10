@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse import csc_matrix,linalg
 
 # Constants
+defaultInputs = 6
 h = 1.0 # Elements size
 E = 2.1e11 # Young's Module
 nu = 0.3 # Poisson ratio
@@ -42,15 +43,16 @@ class Material():
         self.D = (E/(1-nu**2))*np.array([[1,nu,0],[nu,1,0],[0,0,(1-nu)/2]])
     
 class TopOpt():
-    def __init__(self,x,xold,v,r):
+    def __init__(self,x,xold,v,r,p):
         self.x = x
         self.xold = xold
         self.v = v
         self.r = r
+        self.p = p
         self.c = 0.0
         self.dc = np.zeros(x.shape)
          
-    def Filter(self,Mesh):
+    def CreateFilter(self,Mesh):
         self.H = np.zeros((Mesh.nElms,Mesh.nElms))
         coords = Mesh.xy[:,Mesh.Topology.T.flatten()]
         x = np.sum(coords[0,:].reshape(Mesh.nElms,4),axis=1)/4
@@ -61,6 +63,9 @@ class TopOpt():
                 d = np.sum(np.subtract(center[:,jElm],center[:,iElm])**2,axis=0)**0.5
                 self.H[jElm,iElm] = np.maximum(0,self.r-d)
         return self.H
+    
+    def FilterSensitivities(self):
+        pass
     
     def OptimalityCriteria(self,Mesh):
         # Bisection Method
@@ -100,7 +105,7 @@ class FEM():
         col = np.kron(elsDofs,np.ones((dofsElements,1))).T.flatten()
         data = np.repeat(Top.x,64,axis=1)**3*np.tile(Ke.flatten(),(Mesh.nElms,1))
         self.K = csc_matrix((data.flatten(),(row,col)),shape=(Mesh.dofs,Mesh.dofs))
-        return self.K
+        return data
     
     def Loads(self,Mesh):
         self.F = np.zeros((Mesh.dofs,1))
@@ -158,39 +163,54 @@ def ShapeFunctions(Xi,Eta,dFlag):
 
 if __name__ == '__main__':
     # User input
-#     nx = sys.arg[1]
-#     ny = sys.arg[2]
-#     r = sys.arg[3]
-#     v = sys.arg[4]
-    nx = 2
-    ny = 1
-    r = 1.5
-    v = 0.3
+    if len(sys.argv) == defaultInputs:
+        nx = sys.argv[1]
+        ny = sys.argv[2]
+        r = sys.argv[3]
+        v = sys.argv[4]
+        p = sys.argv[5]
+    else:
+        nx = 2
+        ny = 2
+        r = 1.5
+        v = 0.3
+        p = 3
     # Initialize variables
     material = Material()
     mesh = Mesh(nx,ny)
     fem = FEM()
+    fig = plt.figure()
+    ax = fig.gca()
     # Initialize Optimization
     x = v*np.ones((nx*ny,1))
     xold = x
-    top = TopOpt(x,xold,v,r)
-    H = top.Filter(mesh)
-    change = 1000
+    top = TopOpt(x,xold,v,r,p)
+    H = top.CreateFilter(mesh)
+    change = 0
     it = 0
     while change > 1e-4 and it < 300:
         it += 1
         # Solve Elasticty Problem
-        K = fem.K(mesh,material,top)
+        K0 = fem.K(mesh,material,top)
         fem.Loads(mesh)
         u = fem.Solver(mesh)
-        # Evalaute Compliance
-        top.c = u.T@K@u
-        # Evaluate Sensitivities
+        # Evaluate Compliance and Sensitivities
+        for iElm in range(0,mesh.nElms):
+            iNodes = mesh.Topology[:,iElm]
+            iDofs = np.array([2*iNodes,2*iNodes+1]).T.flatten()
+            iK = K0[iElm,:].reshape(dofsElements,dofsElements)
+            top.dc[iElm] = top.p*top.x[iElm]**(top.p-1)*u[iDofs].T@iK@u[iDofs]
+            top.c = top.c + top.x[iElm]**(top.p)*u[iDofs].T@iK@u[iDofs]
         # Update material distribution
+        top.FilterSensitivities()
         top.OptimalityCriteria(mesh)
         change = np.amax(abs(top.x-top.xold))
         top.xold = top.x
         # Plot material distribution
+        ax.clear()
+        ax.pcolor(x,y,top.x)
+        ax.colorbar()
+        
         
 
 
