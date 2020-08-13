@@ -4,6 +4,7 @@ from numpy.linalg import inv, det
 from math import floor
 import matplotlib.pyplot as plt
 from scipy.sparse import csc_matrix,linalg
+import gif
 
 # Constants
 defaultInputs = 6
@@ -97,13 +98,17 @@ class Plots():
         plt.colorbar()
         plt.show()
     
+    @gif.frame
     def MaterialDistribution(self,Top,):
         # Plot material distribution
-        plt.clf()
-        plt.pcolor(top.x.reshape(ny,nx),edgecolors='k',linewidth=1)
+        # plt.clf()
+        plt.pcolor(top.x.reshape(ny,nx),cmap='cool',edgecolors='k',linewidth=0.1)
         plt.colorbar()
-        plt.draw()
-        plt.pause(1e-6)
+        ax = plt.gca()
+        ax.axis('equal')
+        ax.axis('off')
+        # plt.draw()
+        # plt.pause(1e-6)
                      
 class FEM():        
     def K(self,Mesh,Material,Top):
@@ -208,9 +213,7 @@ if __name__ == '__main__':
     fem = FEM()
     # Initialize plot options
     plot = Plots()
-    plt.ion()
-    ax = plt.gca()
-    ax.axis('equal')
+    # plt.ion()
     # Initialize Optimization variables
     x = v*np.ones((nx*ny,1))
     xold = x
@@ -218,10 +221,12 @@ if __name__ == '__main__':
     top.CreateFilter(mesh)
     change = 1000
     it = 0
-    while change > 1e-4 and it < 100:
+    frames = []
+    while change > 1e-3 and it < 1000:
         it += 1
         # Plot Material distribution
-        plot.MaterialDistribution(top)
+        frame = plot.MaterialDistribution(top)
+        frames.append(frame)
         # Solve Elasticty Problem
         K,K0 = fem.K(mesh,material,top)
         fem.Loads(mesh)
@@ -240,14 +245,4 @@ if __name__ == '__main__':
         change = np.amax(abs(top.x-top.xold))
         print('Iteration: {} | Compliance: {} | Change: {}'.format(it,top.c[0,0],change))
         top.xold = top.x
-        
-        
-        
-        
-        
-        
-        
-        
-
-
-
+    gif.save(frames,'TopOpt.gif',duration=50)
